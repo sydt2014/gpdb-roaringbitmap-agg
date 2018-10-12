@@ -246,18 +246,8 @@ CREATE OR REPLACE FUNCTION rb_build_trans(internal, integer)
       AS 'roaringbitmap.so', 'rb_build_trans'
      LANGUAGE C;
 
--- for aggregations rb_build_trans pre start
-
-CREATE OR REPLACE FUNCTION rb_build_trans_pre(internal, internal)  
-     RETURNS internal  
-      AS 'roaringbitmap.so', 'rb_build_trans_pre'  
-     LANGUAGE C IMMUTABLE;     
-
--- for aggregations rb_build_trans pre end
-
 CREATE  AGGREGATE rb_build_agg(integer)(
        SFUNC = rb_build_trans,
-       PREFUNC = rb_build_trans_pre,
        STYPE = internal,
        FINALFUNC = rb_serialize
 );

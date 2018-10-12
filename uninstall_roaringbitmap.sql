@@ -6,7 +6,6 @@ DROP AGGREGATE rb_and_agg(roaringbitmap);
 DROP AGGREGATE rb_or_agg(roaringbitmap);
 
 DROP FUNCTION rb_build_trans(internal, integer);
-DROP FUNCTION rb_build_trans_pre(internal, internal);
 DROP FUNCTION rb_and_trans(internal, roaringbitmap);
 DROP FUNCTION rb_and_trans_pre(internal, internal);
 DROP FUNCTION rb_or_trans(internal, roaringbitmap);

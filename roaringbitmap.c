@@ -808,41 +808,6 @@ rb_build_trans(PG_FUNCTION_ARGS) {
     PG_RETURN_POINTER(r1);
 }
 
-//bitmap build trans for pre
-PG_FUNCTION_INFO_V1(rb_build_trans_pre);
-Datum rb_build_trans_pre(PG_FUNCTION_ARGS);
-
-Datum
-rb_build_trans_pre(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-
-    int bb;
-    roaring_bitmap_t *r1;
-
-
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_build_trans_pre outside transition context")));
-
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
-
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_INT32(1);
-        roaring_bitmap_add(r1, bb);
-    }
-
-    PG_RETURN_POINTER(r1);
-}
-
-
 //bitmap Serialize
 PG_FUNCTION_INFO_V1(rb_serialize);
 Datum rb_serialize(PG_FUNCTION_ARGS);
