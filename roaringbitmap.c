@@ -59,6 +59,8 @@ PG_FUNCTION_INFO_V1(roaringbitmap_in);
 
 Datum
 roaringbitmap_in(PG_FUNCTION_ARGS) {
+    elog(NOTICE, " *********************** roaringbitmap_in ************* ");
+
     Datum dd = DirectFunctionCall1(byteain, PG_GETARG_DATUM(0));
 
     bytea *bp = DatumGetByteaP(dd);
@@ -76,6 +78,7 @@ PG_FUNCTION_INFO_V1(roaringbitmap_out);
 
 Datum
 roaringbitmap_out(PG_FUNCTION_ARGS) {
+    elog(NOTICE, " *********************** roaringbitmap_out ************* ");
     Datum dd = DirectFunctionCall1(byteaout, PG_GETARG_DATUM(0));
     return dd;
 }
@@ -87,6 +90,7 @@ PG_FUNCTION_INFO_V1(roaringbitmap_recv);
 
 Datum
 roaringbitmap_recv(PG_FUNCTION_ARGS) {
+    elog(NOTICE, " *********************** roaringbitmap_recv ************* ");
     Datum dd = DirectFunctionCall1(bytearecv, PG_GETARG_DATUM(0));
     return dd;
 }
@@ -98,6 +102,7 @@ PG_FUNCTION_INFO_V1(roaringbitmap_send);
 
 Datum
 roaringbitmap_send(PG_FUNCTION_ARGS) {
+    elog(NOTICE, " *********************** roaringbitmap_send ************* ");
     Datum dd = PG_GETARG_DATUM(0);
 
     bytea *bp = DatumGetByteaP(dd);
@@ -542,73 +547,36 @@ Datum rb_or_trans(PG_FUNCTION_ARGS);
 
 Datum
 rb_or_trans(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-    bytea *bb;
-    roaring_bitmap_t *r1;
-    roaring_bitmap_t *r2;
+    elog(NOTICE, " *********************** rb_or_trans ************* ");
 
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_or_trans outside transition context")));
+    bytea * p1 = PG_GETARG_BYTEA_P(0);
+    bytea * p2 = PG_GETARG_BYTEA_P(1);
 
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
 
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_BYTEA_P(1);
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
 
-        r2 = roaring_bitmap_portable_deserialize(VARDATA(bb));
+    roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
+    if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
-        roaring_bitmap_or_inplace(r1, r2);
-        roaring_bitmap_free(r2);
-    }
+    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
 
-    PG_RETURN_POINTER(r1);
+    roaring_bitmap_or_inplace(r1, r2);
+    roaring_bitmap_free(r2);
+
+    elog(NOTICE, " *********************** rb_or_trans card1:%d card2: %d ************* ", card1, card2);
+
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
 }
 
-// bitmap or trans for pre
-PG_FUNCTION_INFO_V1(rb_or_trans_pre);
-Datum rb_or_trans_pre(PG_FUNCTION_ARGS);
-
-Datum
-rb_or_trans_pre(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-    bytea *bb;
-    roaring_bitmap_t *r1;
-    roaring_bitmap_t *r2;
-
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_or_trans_pre outside transition context")));
-
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
-
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_BYTEA_P(1);
-
-        r2 = roaring_bitmap_portable_deserialize(VARDATA(bb));
-
-        roaring_bitmap_or_inplace(r1, r2);
-        roaring_bitmap_free(r2);
-    }
-
-    PG_RETURN_POINTER(r1);
-}
 
 //bitmap and trans
 PG_FUNCTION_INFO_V1(rb_and_trans);
@@ -616,81 +584,36 @@ Datum rb_and_trans(PG_FUNCTION_ARGS);
 
 Datum
 rb_and_trans(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-    bytea *bb;
-    roaring_bitmap_t *r1;
-    roaring_bitmap_t *r2;
+    elog(NOTICE, " *********************** rb_and_trans ************* ");
 
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_and_trans outside transition context")));
+    bytea * p1 = PG_GETARG_BYTEA_P(0);
+    bytea * p2 = PG_GETARG_BYTEA_P(1);
 
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
 
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_BYTEA_P(1);
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
 
-        r2 = roaring_bitmap_portable_deserialize(VARDATA(bb));
+    roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
+    if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
-        if (PG_ARGISNULL(0)) {
-            r1 = roaring_bitmap_copy(r2);
-        } else {
-            roaring_bitmap_and_inplace(r1, r2);
-        }
-        roaring_bitmap_free(r2);
-    }
+    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
 
-    PG_RETURN_POINTER(r1);
+    roaring_bitmap_and_inplace(r1, r2);
+    roaring_bitmap_free(r2);
+
+    elog(NOTICE, " *********************** rb_and_trans card1:%d card2: %d ************* ", card1, card2);
+
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
 }
 
-//bitmap and trans for pre
-PG_FUNCTION_INFO_V1(rb_and_trans_pre);
-Datum rb_and_trans_pre(PG_FUNCTION_ARGS);
-
-Datum
-rb_and_trans_pre(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-    bytea *bb;
-    roaring_bitmap_t *r1;
-    roaring_bitmap_t *r2;
-
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_and_trans_pre outside transition context")));
-
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
-
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_BYTEA_P(1);
-
-        r2 = roaring_bitmap_portable_deserialize(VARDATA(bb));
-
-        if (PG_ARGISNULL(0)) {
-            r1 = roaring_bitmap_copy(r2);
-        } else {
-            roaring_bitmap_and_inplace(r1, r2);
-        }
-        roaring_bitmap_free(r2);
-    }
-
-    PG_RETURN_POINTER(r1);
-}
 
 //bitmap xor trans
 PG_FUNCTION_INFO_V1(rb_xor_trans);
@@ -733,46 +656,6 @@ rb_xor_trans(PG_FUNCTION_ARGS) {
     PG_RETURN_POINTER(r1);
 }
 
-//bitmap xor trans for pre
-PG_FUNCTION_INFO_V1(rb_xor_trans_pre);
-Datum rb_xor_trans_pre(PG_FUNCTION_ARGS);
-
-Datum
-rb_xor_trans_pre(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-    bytea *bb;
-    roaring_bitmap_t *r1;
-    roaring_bitmap_t *r2;
-
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_xor_trans_pre outside transition context")));
-
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
-
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_BYTEA_P(1);
-
-        r2 = roaring_bitmap_portable_deserialize(VARDATA(bb));
-
-        if (PG_ARGISNULL(0)) {
-            r1 = roaring_bitmap_copy(r2);
-        } else {
-            roaring_bitmap_xor_inplace(r1, r2);
-        }
-        roaring_bitmap_free(r2);
-    }
-
-    PG_RETURN_POINTER(r1);
-}
 
 //bitmap build trans
 PG_FUNCTION_INFO_V1(rb_build_trans);
@@ -807,6 +690,7 @@ rb_build_trans(PG_FUNCTION_ARGS) {
 
     PG_RETURN_POINTER(r1);
 }
+
 
 //bitmap Serialize
 PG_FUNCTION_INFO_V1(rb_serialize);
@@ -869,6 +753,7 @@ rb_cardinality_trans(PG_FUNCTION_ARGS) {
         PG_RETURN_INT32(card1);
     }
 }
+
 
 //bitmap minimum
 PG_FUNCTION_INFO_V1(rb_minimum);

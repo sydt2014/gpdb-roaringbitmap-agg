@@ -27,6 +27,22 @@
 PG_MODULE_MAGIC;
 #endif
 
+#define   DEBUG   1
+
+typedef bytea * RBP;
+
+#define RBPHDRSIZE (VARHDRSZ)
+#define RBP_PTR(x) VARDATA(x)
+
+#define PG_RETURN_RBPTYPE_P(x)         PG_RETURN_POINTER(x)
+
+#define DatumGetRBPTypeP(X)            ((RBP *) PG_DETOAST_DATUM(X))
+#define DatumGetRBPTypePCopy(X)        ((RBP *) PG_DETOAST_DATUM_COPY(X))
+#define PG_GETARG_RBPTYPE_P(n)         DatumGetRBPTypeP(PG_GETARG_DATUM(n))
+
+#define RBP_DATA_SIZE(x)                VARSIZE(x)
+#define RBP_SIZE(x)                     (RBP_DATA_SIZE(x) + RBPHDRSIZE)
+
 bool ArrayContainsNulls(ArrayType *array);
 
 /* useful macros for accessing int4 arrays */

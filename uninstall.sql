@@ -7,9 +7,7 @@ DROP AGGREGATE rb_or_agg(roaringbitmap);
 
 DROP FUNCTION rb_build_trans(internal, integer);
 DROP FUNCTION rb_and_trans(internal, roaringbitmap);
-DROP FUNCTION rb_and_trans_pre(internal, internal);
 DROP FUNCTION rb_or_trans(internal, roaringbitmap);
-DROP FUNCTION rb_or_trans_pre(internal, roaringbitmap);
 
 DROP FUNCTION rb_xor_trans_pre(internal, internal);
 
@@ -17,9 +15,18 @@ DROP FUNCTION rb_iterate(roaringbitmap);
 DROP FUNCTION rb_cardinality(roaringbitmap);
 DROP FUNCTION rb_andnot(roaringbitmap, roaringbitmap);
 DROP FUNCTION rb_xor(roaringbitmap, roaringbitmap);
-DROP FUNCTION rb_and(roaringbitmap, roaringbitmap);
+DROP FUNCTION rb_build_and(roaringbitmap, roaringbitmap);
 DROP FUNCTION rb_or(roaringbitmap, roaringbitmap);
 DROP FUNCTION rb_build(integer[]);
+DROP FUNCTION rb_add(roaringbitmap, integer[]);
+DROP FUNCTION rb_is_empty(roaringbitmap);
+
+DROP FUNCTION rb_and_trans_pre(internal, internal);
+DROP FUNCTION rb_cardinality_trans(internal);
+DROP FUNCTION rb_or_trans_pre(internal, internal);
+DROP FUNCTION rb_xor_trans_pre(internal, internal);
+
+DROP FUNCTION rb_is_setid(roaringbitmap, integer);
 
 DROP TYPE roaringbitmap CASCADE;
 
