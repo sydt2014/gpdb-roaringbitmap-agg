@@ -1,5 +1,8 @@
 SET search_path = public;
 
+DROP TYPE IF EXISTS roaringbitmap CASCADE;
+CREATE TYPE roaringbitmap;
+
 --- data type --
 
 CREATE OR REPLACE FUNCTION roaringbitmap_in(cstring)
@@ -36,6 +39,12 @@ CREATE TYPE roaringbitmap (
 CREATE OR REPLACE FUNCTION rb_build(integer[])
    RETURNS roaringbitmap 
    AS 'roaringbitmap.so', 'rb_build'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_add(roaringbitmap, integer[])
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_add'
    LANGUAGE C STRICT;
 
 
@@ -139,17 +148,10 @@ CREATE OR REPLACE FUNCTION rb_iterate(roaringbitmap)
    AS 'roaringbitmap.so', 'rb_iterate'
    LANGUAGE C STRICT;
 
-
-CREATE OR REPLACE FUNCTION rb_serialize(internal)
-     RETURNS roaringbitmap
-     AS 'roaringbitmap.so', 'rb_serialize'
-     LANGUAGE C IMMUTABLE;
-
-
-CREATE OR REPLACE FUNCTION rb_cardinality_trans(internal)
+CREATE OR REPLACE FUNCTION rb_cardinality_trans(roaringbitmap)
      RETURNS integer
      AS 'roaringbitmap.so', 'rb_cardinality_trans'
-     LANGUAGE C IMMUTABLE;
+     STRICT LANGUAGE C IMMUTABLE;
 
 
 CREATE OR REPLACE FUNCTION rb_or_trans(roaringbitmap, roaringbitmap)
@@ -157,19 +159,24 @@ CREATE OR REPLACE FUNCTION rb_or_trans(roaringbitmap, roaringbitmap)
       AS 'roaringbitmap.so', 'rb_or_trans'
      STRICT LANGUAGE C IMMUTABLE;
 
+-- aggragations --
+
+DROP AGGREGATE IF EXISTS rb_or_agg(roaringbitmap);
+
 CREATE AGGREGATE rb_or_agg(roaringbitmap)(
        SFUNC = rb_or_trans,
        STYPE = roaringbitmap,
        PREFUNC = rb_or_trans
 );
 
--- aggragations --
+DROP AGGREGATE IF EXISTS rb_or_cardinality_agg(roaringbitmap);
 
---CREATE AGGREGATE rb_or_cardinality_agg(roaringbitmap)(
---       SFUNC = rb_or_trans,
---       STYPE = internal,
---       FINALFUNC = rb_cardinality_trans
---);
+CREATE AGGREGATE rb_or_cardinality_agg(roaringbitmap)(
+       SFUNC = rb_or_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_or_trans,
+       FINALFUNC = rb_cardinality_trans
+);
 
 
 CREATE OR REPLACE FUNCTION rb_and_trans(roaringbitmap, roaringbitmap)
@@ -184,38 +191,36 @@ CREATE AGGREGATE rb_and_agg(roaringbitmap)(
 );
 
 
---CREATE AGGREGATE rb_and_cardinality_agg(roaringbitmap)(
---       SFUNC = rb_and_trans,
---       STYPE = internal,
---       FINALFUNC = rb_cardinality_trans
---);
+DROP AGGREGATE IF EXISTS rb_and_cardinality_agg(roaringbitmap);
 
-
-CREATE OR REPLACE FUNCTION rb_xor_trans(internal, roaringbitmap)
-     RETURNS internal
-      AS 'roaringbitmap.so', 'rb_xor_trans'
-     LANGUAGE C IMMUTABLE;
-
-CREATE AGGREGATE rb_xor_agg(roaringbitmap)(
-       SFUNC = rb_xor_trans,
-       STYPE = internal,
-       FINALFUNC = rb_serialize
-);
-
-
-CREATE AGGREGATE rb_xor_cardinality_agg(roaringbitmap)(
-       SFUNC = rb_xor_trans,
-       STYPE = internal,
+CREATE AGGREGATE rb_and_cardinality_agg(roaringbitmap)(
+       SFUNC = rb_and_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_and_trans,
        FINALFUNC = rb_cardinality_trans
 );
 
-CREATE OR REPLACE FUNCTION rb_build_trans(internal, integer)
-     RETURNS internal
-      AS 'roaringbitmap.so', 'rb_build_trans'
-     LANGUAGE C;
 
-CREATE  AGGREGATE rb_build_agg(integer)(
-       SFUNC = rb_build_trans,
-       STYPE = internal,
-       FINALFUNC = rb_serialize
+CREATE OR REPLACE FUNCTION rb_xor_trans(roaringbitmap, roaringbitmap)
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_xor_trans'
+     STRICT LANGUAGE C IMMUTABLE;
+
+
+DROP AGGREGATE IF EXISTS rb_xor_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_xor_agg(roaringbitmap)(
+       SFUNC = rb_xor_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_xor_trans
+);
+
+
+DROP AGGREGATE IF EXISTS rb_xor_cardinality_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_xor_cardinality_agg(roaringbitmap)(
+       SFUNC = rb_xor_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_xor_trans,
+       FINALFUNC = rb_cardinality_trans
 );

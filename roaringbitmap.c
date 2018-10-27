@@ -1,6 +1,7 @@
 #include "roaringbitmap.h"
 
 /* Created by ZEROMAX on 2017/3/20.*/
+/* Modify by changyue.zhou on 2018/20/10.*/
 
 bool
 ArrayContainsNulls(ArrayType *array) {
@@ -59,8 +60,6 @@ PG_FUNCTION_INFO_V1(roaringbitmap_in);
 
 Datum
 roaringbitmap_in(PG_FUNCTION_ARGS) {
-    elog(NOTICE, " *********************** roaringbitmap_in ************* ");
-
     Datum dd = DirectFunctionCall1(byteain, PG_GETARG_DATUM(0));
 
     bytea *bp = DatumGetByteaP(dd);
@@ -78,7 +77,6 @@ PG_FUNCTION_INFO_V1(roaringbitmap_out);
 
 Datum
 roaringbitmap_out(PG_FUNCTION_ARGS) {
-    elog(NOTICE, " *********************** roaringbitmap_out ************* ");
     Datum dd = DirectFunctionCall1(byteaout, PG_GETARG_DATUM(0));
     return dd;
 }
@@ -90,7 +88,6 @@ PG_FUNCTION_INFO_V1(roaringbitmap_recv);
 
 Datum
 roaringbitmap_recv(PG_FUNCTION_ARGS) {
-    elog(NOTICE, " *********************** roaringbitmap_recv ************* ");
     Datum dd = DirectFunctionCall1(bytearecv, PG_GETARG_DATUM(0));
     return dd;
 }
@@ -102,7 +99,6 @@ PG_FUNCTION_INFO_V1(roaringbitmap_send);
 
 Datum
 roaringbitmap_send(PG_FUNCTION_ARGS) {
-    elog(NOTICE, " *********************** roaringbitmap_send ************* ");
     Datum dd = PG_GETARG_DATUM(0);
 
     bytea *bp = DatumGetByteaP(dd);
@@ -475,6 +471,41 @@ rb_build(PG_FUNCTION_ARGS) {
     PG_RETURN_BYTEA_P(serializedbytes);
 }
 
+//bitmap add
+PG_FUNCTION_INFO_V1(rb_add);
+Datum rb_add(PG_FUNCTION_ARGS);
+
+Datum
+rb_add(PG_FUNCTION_ARGS) {
+    bytea *serializedbytes1 = PG_GETARG_BYTEA_P(0);
+
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(serializedbytes1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap format is error")));
+
+    ArrayType *a = (ArrayType *) PG_GETARG_ARRAYTYPE_P(1);
+
+    int na, n;
+    int *da;
+
+    CHECKARRVALID(a);
+
+    na = ARRNELEMS(a);
+    da = ARRPTR(a);
+
+    for (n = 0; n < na; n++) {
+        roaring_bitmap_add(r1, da[n]);
+    }
+
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
+}
+
 //bitmap list
 PG_FUNCTION_INFO_V1(rb_iterate);
 Datum rb_iterate(PG_FUNCTION_ARGS);
@@ -517,28 +548,21 @@ rb_iterate(PG_FUNCTION_ARGS) {
     }
 }
 
-//setup
-roaring_bitmap_t *setup_roaringbitmap(MemoryContext rcontext);
+//bitmap is rb_is_setid
+PG_FUNCTION_INFO_V1(rb_is_setid);
+Datum rb_is_setid(PG_FUNCTION_ARGS);
 
-roaring_bitmap_t *
-setup_roaringbitmap(MemoryContext rcontext) {
-    MemoryContext tmpcontext;
-    MemoryContext oldcontext;
-    roaring_bitmap_t *r1;
+Datum
+rb_is_setid(PG_FUNCTION_ARGS) {
+    bytea *data = PG_GETARG_BYTEA_P(0);
 
-    tmpcontext = AllocSetContextCreate(rcontext,
-                                       "roaring_bitmap_t",
-                                       ALLOCSET_DEFAULT_MINSIZE,
-                                       ALLOCSET_DEFAULT_INITSIZE,
-                                       ALLOCSET_DEFAULT_MAXSIZE);
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(data));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap format is error")));
 
-    oldcontext = MemoryContextSwitchTo(tmpcontext);
+    bool is_set = roaring_bitmap_contains(r1);
 
-    r1 = roaring_bitmap_create();
-
-    MemoryContextSwitchTo(oldcontext);
-
-    return r1;
+    roaring_bitmap_free(r1);
+    PG_RETURN_BOOL(is_set);
 }
 
 //bitmap or trans
@@ -547,8 +571,6 @@ Datum rb_or_trans(PG_FUNCTION_ARGS);
 
 Datum
 rb_or_trans(PG_FUNCTION_ARGS) {
-    elog(NOTICE, " *********************** rb_or_trans ************* ");
-
     bytea * p1 = PG_GETARG_BYTEA_P(0);
     bytea * p2 = PG_GETARG_BYTEA_P(1);
 
@@ -560,12 +582,15 @@ rb_or_trans(PG_FUNCTION_ARGS) {
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
+#ifdef DEBUG
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
     int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
+
+    elog(NOTICE, " *********************** rb_or_trans card1:%d card2: %d ************* ", card1, card2);
+#endif
 
     roaring_bitmap_or_inplace(r1, r2);
     roaring_bitmap_free(r2);
-
-    elog(NOTICE, " *********************** rb_or_trans card1:%d card2: %d ************* ", card1, card2);
 
     size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
 
@@ -584,25 +609,24 @@ Datum rb_and_trans(PG_FUNCTION_ARGS);
 
 Datum
 rb_and_trans(PG_FUNCTION_ARGS) {
-    elog(NOTICE, " *********************** rb_and_trans ************* ");
-
     bytea * p1 = PG_GETARG_BYTEA_P(0);
     bytea * p2 = PG_GETARG_BYTEA_P(1);
 
     roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
     if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
 
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
+#ifdef DEBUG
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
     int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
+
+    elog(NOTICE, " *********************** rb_and_trans card1:%d card2: %d ************* ", card1, card2);
+#endif
 
     roaring_bitmap_and_inplace(r1, r2);
     roaring_bitmap_free(r2);
-
-    elog(NOTICE, " *********************** rb_and_trans card1:%d card2: %d ************* ", card1, card2);
 
     size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
 
@@ -621,109 +645,34 @@ Datum rb_xor_trans(PG_FUNCTION_ARGS);
 
 Datum
 rb_xor_trans(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-    bytea *bb;
-    roaring_bitmap_t *r1;
-    roaring_bitmap_t *r2;
+    bytea * p1 = PG_GETARG_BYTEA_P(0);
+    bytea * p2 = PG_GETARG_BYTEA_P(1);
 
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_xor_trans outside transition context")));
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
 
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
+    roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
+    if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_BYTEA_P(1);
+#ifdef DEBUG
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
+    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
 
-        r2 = roaring_bitmap_portable_deserialize(VARDATA(bb));
+    elog(NOTICE, " *********************** rb_xor_trans card1:%d card2: %d ************* ", card1, card2);
+#endif
 
-        if (PG_ARGISNULL(0)) {
-            r1 = roaring_bitmap_copy(r2);
-        } else {
-            roaring_bitmap_xor_inplace(r1, r2);
-        }
-        roaring_bitmap_free(r2);
-    }
+    roaring_bitmap_xor_inplace(r1, r2);
+    roaring_bitmap_free(r2);
 
-    PG_RETURN_POINTER(r1);
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
 }
-
-
-//bitmap build trans
-PG_FUNCTION_INFO_V1(rb_build_trans);
-Datum rb_build_trans(PG_FUNCTION_ARGS);
-
-Datum
-rb_build_trans(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-
-    int bb;
-    roaring_bitmap_t *r1;
-
-
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_build_trans outside transition context")));
-
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        r1 = setup_roaringbitmap(aggctx);
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-    }
-
-    // Is the second argument non-null?
-    if (!PG_ARGISNULL(1)) {
-        bb = PG_GETARG_INT32(1);
-        roaring_bitmap_add(r1, bb);
-    }
-
-    PG_RETURN_POINTER(r1);
-}
-
-
-//bitmap Serialize
-PG_FUNCTION_INFO_V1(rb_serialize);
-Datum rb_serialize(PG_FUNCTION_ARGS);
-
-Datum
-rb_serialize(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
-
-    roaring_bitmap_t *r1;
-
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_serialize outside aggregate context")));
-
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        PG_RETURN_NULL();
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
-
-        size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
-        bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
-        roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
-        roaring_bitmap_free(r1);
-
-        SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
-        PG_RETURN_BYTEA_P(serializedbytes);
-    }
-}
-
 
 //bitmap Cardinality trans
 PG_FUNCTION_INFO_V1(rb_cardinality_trans);
@@ -731,29 +680,20 @@ Datum rb_cardinality_trans(PG_FUNCTION_ARGS);
 
 Datum
 rb_cardinality_trans(PG_FUNCTION_ARGS) {
-    MemoryContext aggctx;
+    bytea * p1 = PG_GETARG_BYTEA_P(0);
 
-    roaring_bitmap_t *r1;
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
 
-    // We must be called as a transition routine or we fail.
-    if (!AggCheckCallContext(fcinfo, &aggctx))
-        ereport(ERROR,
-                (errcode(ERRCODE_DATA_EXCEPTION),
-                        errmsg("rb_cardinality_trans outside aggregate context")));
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
+    roaring_bitmap_free(r1);
 
-    // Is the first argument a NULL?
-    if (PG_ARGISNULL(0)) {
-        PG_RETURN_NULL();
-    } else {
-        r1 = (roaring_bitmap_t *) PG_GETARG_POINTER(0);
+#ifdef DEBUG
+    elog(NOTICE, " *********************** rb_cardinality_trans card1:%d ************* ", card1);
+#endif    
 
-        int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-        roaring_bitmap_free(r1);
-
-        PG_RETURN_INT32(card1);
-    }
+    PG_RETURN_INT32(card1);
 }
-
 
 //bitmap minimum
 PG_FUNCTION_INFO_V1(rb_minimum);

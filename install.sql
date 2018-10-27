@@ -1,69 +1,231 @@
-SET search_path = public;
-
-DROP TYPE IF EXISTS RBP CASCADE;
-CREATE TYPE RBP;
+DROP TYPE IF EXISTS roaringbitmap CASCADE;
+CREATE TYPE roaringbitmap;
 
 --- data type --
 
-CREATE OR REPLACE FUNCTION RBP_IN(cstring)
-   RETURNS RBP
-   AS 'roaringbitmap.so','rbp_in'
+CREATE OR REPLACE FUNCTION roaringbitmap_in(cstring)
+   RETURNS roaringbitmap
+   AS 'roaringbitmap.so','roaringbitmap_in'
    LANGUAGE C STRICT IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION RBP_OUT(RBP)
+CREATE OR REPLACE FUNCTION roaringbitmap_out(roaringbitmap)
    RETURNS cstring
-   AS 'roaringbitmap.so','rbp_out'
+   AS 'roaringbitmap.so','roaringbitmap_out'
    LANGUAGE C STRICT IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION RBP_RECV(internal)
-   RETURNS RBP
-   AS 'roaringbitmap.so','rbp_recv'
+CREATE OR REPLACE FUNCTION roaringbitmap_recv(internal)
+   RETURNS roaringbitmap
+   AS 'roaringbitmap.so','roaringbitmap_recv'
    LANGUAGE C STRICT IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION RBP_SEND(RBP)
+CREATE OR REPLACE FUNCTION roaringbitmap_send(roaringbitmap)
    RETURNS bytea
-   AS 'roaringbitmap.so','rbp_send'
+   AS 'roaringbitmap.so','roaringbitmap_send'
    LANGUAGE C STRICT IMMUTABLE;
 
-CREATE TYPE RBP (
+CREATE TYPE roaringbitmap (
     INTERNALLENGTH = VARIABLE,
-    INPUT = RBP_IN,
-    OUTPUT = RBP_OUT,
-    receive = RBP_RECV,
-    send = RBP_SEND,
-    STORAGE = external,
-    alignment = int4
+    INPUT = roaringbitmap_in,
+    OUTPUT = roaringbitmap_out,
+    receive = roaringbitmap_recv,
+    send = roaringbitmap_send,
+    STORAGE = external
  );
 
 -- functions --
 
-CREATE OR REPLACE FUNCTION RBP_CREATE(integer[])
-   RETURNS RBP 
-   AS 'roaringbitmap.so', 'rbp_create'
-   STRICT LANGUAGE C IMMUTABLE;
+CREATE OR REPLACE FUNCTION rb_build(integer[])
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_build'
+   LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION RBP_CARDINALITY(RBP)
+
+CREATE OR REPLACE FUNCTION rb_add(roaringbitmap, integer[])
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_add'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_or(roaringbitmap, roaringbitmap)
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_or'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_or_cardinality(roaringbitmap, roaringbitmap)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_or_cardinality'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_and(roaringbitmap, roaringbitmap)
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_and'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_and_cardinality(roaringbitmap, roaringbitmap)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_and_cardinality'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_xor(roaringbitmap, roaringbitmap)
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_xor'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_xor_cardinality(roaringbitmap, roaringbitmap)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_xor_cardinality'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_andnot(roaringbitmap, roaringbitmap)
+   RETURNS roaringbitmap 
+   AS 'roaringbitmap.so', 'rb_andnot'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_andnot_cardinality(roaringbitmap, roaringbitmap)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_andnot_cardinality'
+   LANGUAGE C STRICT;
+
+
+CREATE OR REPLACE FUNCTION rb_cardinality(roaringbitmap)
    RETURNS integer 
-   AS 'roaringbitmap.so', 'rbp_cardinality'
-   STRICT LANGUAGE C IMMUTABLE;
+   AS 'roaringbitmap.so', 'rb_cardinality'
+   LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION RBP_AND_AGG_SFUNC(RBP, RBP)
-   RETURNS RBP
-   AS 'roaringbitmap.so', 'rbp_and_agg_sfunc'
-   LANGUAGE C IMMUTABLE;
 
-DROP AGGREGATE IF EXISTS RBP_AND_AGG(RBP);
+CREATE OR REPLACE FUNCTION rb_is_empty(roaringbitmap)
+  RETURNS bool
+  AS  'roaringbitmap.so', 'rb_is_empty'
+   LANGUAGE C STRICT;
 
-CREATE AGGREGATE RBP_AND_AGG(RBP) (  
-       SFUNC = RBP_AND_AGG_SFUNC,  
-       STYPE = RBP,
-       INITCOND = NULL
-);  
 
-DROP TABLE t_customer_tag;
-CREATE TABLE t_customer_tag (tagid varchar(64), bitmap RBP, start_date date, end_date date)
-       DISTRIBUTED BY (tagid);
-       
-CREATE INDEX customer_tag_tagid_ix ON t_customer_tag (tagid);
+CREATE OR REPLACE FUNCTION rb_equals(roaringbitmap, roaringbitmap)
+  RETURNS bool
+  AS  'roaringbitmap.so', 'rb_equals'
+   LANGUAGE C STRICT;
 
-insert into t_customer_tag (tagid, bitmap, start_date, end_date) values ('1', RBP_CREATE(array[1]), '2018-10-17', '2099-12-31');      
+
+CREATE OR REPLACE FUNCTION rb_intersect(roaringbitmap, roaringbitmap)
+  RETURNS bool
+  AS  'roaringbitmap.so', 'rb_intersect'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_remove(roaringbitmap, integer)
+   RETURNS roaringbitmap
+   AS 'roaringbitmap.so', 'rb_remove'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_flip(roaringbitmap, integer, integer)
+   RETURNS roaringbitmap
+   AS 'roaringbitmap.so', 'rb_flip'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_minimum(roaringbitmap)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_minimum'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_maximum(roaringbitmap)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_maximum'
+   LANGUAGE C STRICT;
+
+ CREATE OR REPLACE FUNCTION rb_rank(roaringbitmap, integer)
+   RETURNS integer
+   AS 'roaringbitmap.so', 'rb_rank'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_iterate(roaringbitmap)
+   RETURNS SETOF integer 
+   AS 'roaringbitmap.so', 'rb_iterate'
+   LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION rb_is_setid(roaringbitmap, integer)
+   RETURNS bool
+   AS 'roaringbitmap.so', 'rb_is_setid'
+   LANGUAGE C STRICT;
+
+
+-- aggragations --
+
+CREATE OR REPLACE FUNCTION rb_cardinality_trans(roaringbitmap)
+     RETURNS integer
+     AS 'roaringbitmap.so', 'rb_cardinality_trans'
+     STRICT LANGUAGE C IMMUTABLE;
+
+
+CREATE OR REPLACE FUNCTION rb_or_trans(roaringbitmap, roaringbitmap)
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_or_trans'
+     STRICT LANGUAGE C IMMUTABLE;
+
+DROP AGGREGATE IF EXISTS rb_or_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_or_agg(roaringbitmap)(
+       SFUNC = rb_or_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_or_trans
+);
+
+DROP AGGREGATE IF EXISTS rb_or_cardinality_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_or_cardinality_agg(roaringbitmap)(
+       SFUNC = rb_or_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_or_trans,
+       FINALFUNC = rb_cardinality_trans
+);
+
+
+CREATE OR REPLACE FUNCTION rb_and_trans(roaringbitmap, roaringbitmap)
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_and_trans'
+    STRICT LANGUAGE C IMMUTABLE;
+
+DROP AGGREGATE IF EXISTS rb_and_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_and_agg(roaringbitmap)(
+       SFUNC = rb_and_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_and_trans
+);
+
+
+DROP AGGREGATE IF EXISTS rb_and_cardinality_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_and_cardinality_agg(roaringbitmap)(
+       SFUNC = rb_and_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_and_trans,
+       FINALFUNC = rb_cardinality_trans
+);
+
+CREATE OR REPLACE FUNCTION rb_xor_trans(roaringbitmap, roaringbitmap)
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_xor_trans'
+     STRICT LANGUAGE C IMMUTABLE;
+
+
+DROP AGGREGATE IF EXISTS rb_xor_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_xor_agg(roaringbitmap)(
+       SFUNC = rb_xor_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_xor_trans
+);
+
+
+DROP AGGREGATE IF EXISTS rb_xor_cardinality_agg(roaringbitmap);
+
+CREATE AGGREGATE rb_xor_cardinality_agg(roaringbitmap)(
+       SFUNC = rb_xor_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_xor_trans,
+       FINALFUNC = rb_cardinality_trans
+);

@@ -2,6 +2,7 @@
 #define __ROARINGBITMAP_H__
 
 /* Created by ZEROMAX on 2017/3/20.*/
+/* Modify by changyue.zhou on 2018/20/10.*/
 
 #include "postgres.h"
 
@@ -26,6 +27,8 @@
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
 #endif
+
+#define DEBUG 1
 
 bool ArrayContainsNulls(ArrayType *array);
 
