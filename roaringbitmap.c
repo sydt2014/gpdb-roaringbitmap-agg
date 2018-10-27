@@ -555,11 +555,12 @@ Datum rb_is_setid(PG_FUNCTION_ARGS);
 Datum
 rb_is_setid(PG_FUNCTION_ARGS) {
     bytea *data = PG_GETARG_BYTEA_P(0);
+    int32 offset = PG_GETARG_INT32(1);
 
     roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(data));
     if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap format is error")));
 
-    bool is_set = roaring_bitmap_contains(r1);
+    bool is_set = roaring_bitmap_contains(r1, offset);
 
     roaring_bitmap_free(r1);
     PG_RETURN_BOOL(is_set);
@@ -576,8 +577,6 @@ rb_or_trans(PG_FUNCTION_ARGS) {
 
     roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
     if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
-
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
 
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
