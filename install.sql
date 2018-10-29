@@ -154,6 +154,27 @@ CREATE OR REPLACE FUNCTION rb_is_setid(roaringbitmap, integer)
 
 -- aggragations --
 
+CREATE OR REPLACE FUNCTION rb_build_trans(roaringbitmap, integer)
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_build_trans'
+     STRICT LANGUAGE C IMMUTABLE;
+
+
+CREATE OR REPLACE FUNCTION rb_build_trans_pre(roaringbitmap, roaringbitmap)
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_build_trans_pre'
+     STRICT LANGUAGE C IMMUTABLE;    
+
+
+DROP AGGREGATE IF EXISTS rb_build_agg(integer);
+
+CREATE AGGREGATE rb_build_agg(integer)(
+       SFUNC = rb_build_trans,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_build_trans_pre,
+       INITCOND = ':0\000\000\001\000\000\000\000\000\000\000\020\000\000\000\000\000'
+);
+
 CREATE OR REPLACE FUNCTION rb_cardinality_trans(roaringbitmap)
      RETURNS integer
      AS 'roaringbitmap.so', 'rb_cardinality_trans'

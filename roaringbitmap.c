@@ -47,7 +47,7 @@ roaringbitmap(PG_FUNCTION_ARGS) {
     bytea *serializedbytes = PG_GETARG_BYTEA_P(0);
 
     roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(serializedbytes));
-    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap format is error")));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("[roaringbitmap] bitmap format is error")));
 
     roaring_bitmap_free(r1);
     PG_RETURN_BYTEA_P(serializedbytes);
@@ -64,7 +64,7 @@ roaringbitmap_in(PG_FUNCTION_ARGS) {
 
     bytea *bp = DatumGetByteaP(dd);
     roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(bp));
-    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap format is error")));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("[roaringbitmap_in] bitmap format is error")));
 
     roaring_bitmap_free(r1);
     return dd;
@@ -471,6 +471,72 @@ rb_build(PG_FUNCTION_ARGS) {
     PG_RETURN_BYTEA_P(serializedbytes);
 }
 
+//bitmap build trans
+PG_FUNCTION_INFO_V1(rb_build_trans);
+Datum rb_build_trans(PG_FUNCTION_ARGS);
+
+Datum
+rb_build_trans(PG_FUNCTION_ARGS) {
+    bytea *serializedbytes1 = PG_GETARG_BYTEA_P(0);
+
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(serializedbytes1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("[rb_build_trans] bitmap format is error")));
+
+    int32 offsetid = PG_GETARG_INT32(1);
+
+    roaring_bitmap_add(r1, offsetid);
+
+#ifdef DEBUG
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
+
+    elog(NOTICE, " *********************** rb_build_trans card1:%d ************* ", card1);
+#endif    
+
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
+}
+
+//bitmap build trans prefunc
+PG_FUNCTION_INFO_V1(rb_build_trans_pre);
+Datum rb_build_trans_pre(PG_FUNCTION_ARGS);
+
+Datum
+rb_build_trans_pre(PG_FUNCTION_ARGS) {
+    bytea * p1 = PG_GETARG_BYTEA_P(0);
+    bytea * p2 = PG_GETARG_BYTEA_P(1);
+
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(p1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
+
+    roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
+    if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
+
+#ifdef DEBUG
+    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
+    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
+
+    elog(NOTICE, " *********************** rb_build_trans_pre card1:%d card2: %d ************* ", card1, card2);
+#endif
+
+    roaring_bitmap_or_inplace(r1, r2);
+    roaring_bitmap_free(r2);
+
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
+}
+
 //bitmap add
 PG_FUNCTION_INFO_V1(rb_add);
 Datum rb_add(PG_FUNCTION_ARGS);
@@ -480,7 +546,7 @@ rb_add(PG_FUNCTION_ARGS) {
     bytea *serializedbytes1 = PG_GETARG_BYTEA_P(0);
 
     roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(serializedbytes1));
-    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap format is error")));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("[rb_add] bitmap format is error")));
 
     ArrayType *a = (ArrayType *) PG_GETARG_ARRAYTYPE_P(1);
 

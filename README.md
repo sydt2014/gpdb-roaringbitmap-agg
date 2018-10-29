@@ -73,6 +73,13 @@ SELECT RB_ITERATE(bitmap) FROM t1 WHERE id = 1;
         <td><code>rb_build('{1,2,3,4,5}')</code></td>
     </tr>
     <tr>
+        <td><code>rb_add</code></td>
+        <td><code>roaringbitmap, integer[]</code></td>
+        <td><code>roaringbitmap</code></td>
+        <td>add integer array into roaringbitmap.</td>
+        <td><code>rb_add(rb_build('{1,2,3,4,5}'), array[1,2,3])</code></td>
+    </tr>    
+    <tr>
         <td><code>rb_and</code></td>
         <td><code>roraingbitmap,roaringbitmap</code></td>
         <td><code>roaringbitmap</code></td>
@@ -191,6 +198,13 @@ SELECT RB_ITERATE(bitmap) FROM t1 WHERE id = 1;
         <td>Return the number of offsets that are smaller or equal to the specified offset.</td>
         <td><code>rb_rank(rb_build('{1,2,3}'),3)</code></td>
     </tr>
+    <tr>
+        <td><code>rb_is_setid</code></td>
+        <td><code>roraingbitmap,integer</code></td>
+        <td><code>bool</code></td>
+        <td>Return the special offset id is or not set.</td>
+        <td><code>rb_is_setid(rb_build('{1,2,3}'),3)</code></td>
+    </tr>    
 </table>
 
 ## Aggregation List

@@ -22,6 +22,10 @@ DROP FUNCTION rb_rank(roaringbitmap, integer);
 DROP FUNCTION rb_iterate(roaringbitmap);
 DROP FUNCTION rb_is_setid(roaringbitmap, integer);
 
+DROP AGGREGATE IF EXISTS rb_build_agg(integer);
+DROP FUNCTION rb_build_trans(roaringbitmap, integer);
+DROP FUNCTION rb_build_trans_ore(roaringbitmap, roaringbitmap);
+
 DROP AGGREGATE IF EXISTS rb_or_cardinality_agg(roaringbitmap);
 DROP AGGREGATE IF EXISTS rb_or_agg(roaringbitmap);
 DROP FUNCTION rb_cardinality_trans(roaringbitmap);
