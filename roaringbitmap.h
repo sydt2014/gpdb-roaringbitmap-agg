@@ -28,7 +28,7 @@
 PG_MODULE_MAGIC;
 #endif
 
-#define DEBUG 1
+#define DEBUG 0
 
 bool ArrayContainsNulls(ArrayType *array);
 

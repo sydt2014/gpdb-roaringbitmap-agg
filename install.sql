@@ -34,13 +34,13 @@ CREATE TYPE roaringbitmap (
 
 -- functions --
 
-CREATE OR REPLACE FUNCTION rb_build(integer[])
+CREATE OR REPLACE FUNCTION rb_build(bigint[])
    RETURNS roaringbitmap 
    AS 'roaringbitmap.so', 'rb_build'
    LANGUAGE C STRICT;
 
 
-CREATE OR REPLACE FUNCTION rb_add(roaringbitmap, integer[])
+CREATE OR REPLACE FUNCTION rb_add(roaringbitmap, bigint[])
    RETURNS roaringbitmap 
    AS 'roaringbitmap.so', 'rb_add'
    LANGUAGE C STRICT;
@@ -53,7 +53,7 @@ CREATE OR REPLACE FUNCTION rb_or(roaringbitmap, roaringbitmap)
 
 
 CREATE OR REPLACE FUNCTION rb_or_cardinality(roaringbitmap, roaringbitmap)
-   RETURNS integer
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_or_cardinality'
    LANGUAGE C STRICT;
 
@@ -64,7 +64,7 @@ CREATE OR REPLACE FUNCTION rb_and(roaringbitmap, roaringbitmap)
 
 
 CREATE OR REPLACE FUNCTION rb_and_cardinality(roaringbitmap, roaringbitmap)
-   RETURNS integer
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_and_cardinality'
    LANGUAGE C STRICT;
 
@@ -76,7 +76,7 @@ CREATE OR REPLACE FUNCTION rb_xor(roaringbitmap, roaringbitmap)
 
 
 CREATE OR REPLACE FUNCTION rb_xor_cardinality(roaringbitmap, roaringbitmap)
-   RETURNS integer
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_xor_cardinality'
    LANGUAGE C STRICT;
 
@@ -88,13 +88,13 @@ CREATE OR REPLACE FUNCTION rb_andnot(roaringbitmap, roaringbitmap)
 
 
 CREATE OR REPLACE FUNCTION rb_andnot_cardinality(roaringbitmap, roaringbitmap)
-   RETURNS integer
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_andnot_cardinality'
    LANGUAGE C STRICT;
 
 
 CREATE OR REPLACE FUNCTION rb_cardinality(roaringbitmap)
-   RETURNS integer 
+   RETURNS bigint 
    AS 'roaringbitmap.so', 'rb_cardinality'
    LANGUAGE C STRICT;
 
@@ -116,37 +116,37 @@ CREATE OR REPLACE FUNCTION rb_intersect(roaringbitmap, roaringbitmap)
   AS  'roaringbitmap.so', 'rb_intersect'
    LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION rb_remove(roaringbitmap, integer)
+CREATE OR REPLACE FUNCTION rb_remove(roaringbitmap, bigint)
    RETURNS roaringbitmap
    AS 'roaringbitmap.so', 'rb_remove'
    LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION rb_flip(roaringbitmap, integer, integer)
+CREATE OR REPLACE FUNCTION rb_flip(roaringbitmap, bigint, bigint)
    RETURNS roaringbitmap
    AS 'roaringbitmap.so', 'rb_flip'
    LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION rb_minimum(roaringbitmap)
-   RETURNS integer
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_minimum'
    LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION rb_maximum(roaringbitmap)
-   RETURNS integer
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_maximum'
    LANGUAGE C STRICT;
 
- CREATE OR REPLACE FUNCTION rb_rank(roaringbitmap, integer)
-   RETURNS integer
+ CREATE OR REPLACE FUNCTION rb_rank(roaringbitmap, bigint)
+   RETURNS bigint
    AS 'roaringbitmap.so', 'rb_rank'
    LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION rb_iterate(roaringbitmap)
-   RETURNS SETOF integer 
+   RETURNS SETOF bigint 
    AS 'roaringbitmap.so', 'rb_iterate'
    LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION rb_is_setid(roaringbitmap, integer)
+CREATE OR REPLACE FUNCTION rb_is_setid(roaringbitmap, bigint)
    RETURNS bool
    AS 'roaringbitmap.so', 'rb_is_setid'
    LANGUAGE C STRICT;
@@ -154,10 +154,16 @@ CREATE OR REPLACE FUNCTION rb_is_setid(roaringbitmap, integer)
 
 -- aggragations --
 
-CREATE OR REPLACE FUNCTION rb_build_trans(roaringbitmap, integer)
+CREATE OR REPLACE FUNCTION rb_build_trans(roaringbitmap, bigint)
      RETURNS roaringbitmap
       AS 'roaringbitmap.so', 'rb_build_trans'
      STRICT LANGUAGE C IMMUTABLE;
+
+
+CREATE OR REPLACE FUNCTION rb_build_trans_by_array(roaringbitmap, bigint[])
+     RETURNS roaringbitmap
+      AS 'roaringbitmap.so', 'rb_build_trans_by_array'
+     STRICT LANGUAGE C IMMUTABLE;     
 
 
 CREATE OR REPLACE FUNCTION rb_build_trans_pre(roaringbitmap, roaringbitmap)
@@ -166,17 +172,26 @@ CREATE OR REPLACE FUNCTION rb_build_trans_pre(roaringbitmap, roaringbitmap)
      STRICT LANGUAGE C IMMUTABLE;    
 
 
-DROP AGGREGATE IF EXISTS rb_build_agg(integer);
+DROP AGGREGATE IF EXISTS rb_build_agg(bigint);
 
-CREATE AGGREGATE rb_build_agg(integer)(
+CREATE AGGREGATE rb_build_agg(bigint)(
        SFUNC = rb_build_trans,
        STYPE = roaringbitmap,
        PREFUNC = rb_build_trans_pre,
        INITCOND = ':0\000\000\001\000\000\000\000\000\000\000\020\000\000\000\000\000'
 );
 
+DROP AGGREGATE IF EXISTS rb_build_by_array_agg(bigint[]);
+
+CREATE AGGREGATE rb_build_by_array_agg(bigint[])(
+       SFUNC = rb_build_trans_by_array,
+       STYPE = roaringbitmap,
+       PREFUNC = rb_build_trans_pre,
+       INITCOND = ':0\000\000\001\000\000\000\000\000\000\000\020\000\000\000\000\000'
+);
+
 CREATE OR REPLACE FUNCTION rb_cardinality_trans(roaringbitmap)
-     RETURNS integer
+     RETURNS bigint
      AS 'roaringbitmap.so', 'rb_cardinality_trans'
      STRICT LANGUAGE C IMMUTABLE;
 

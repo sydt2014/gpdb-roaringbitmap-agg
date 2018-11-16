@@ -471,6 +471,41 @@ rb_build(PG_FUNCTION_ARGS) {
     PG_RETURN_BYTEA_P(serializedbytes);
 }
 
+//bitmap build trans by array
+PG_FUNCTION_INFO_V1(rb_build_trans_by_array);
+Datum rb_build_trans_by_array(PG_FUNCTION_ARGS);
+
+Datum
+rb_build_trans_by_array(PG_FUNCTION_ARGS) {
+    bytea *serializedbytes1 = PG_GETARG_BYTEA_P(0);
+
+    roaring_bitmap_t *r1 = roaring_bitmap_portable_deserialize(VARDATA(serializedbytes1));
+    if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("[rb_build_trans_by_array] bitmap format is error")));
+
+    ArrayType *a = (ArrayType *) PG_GETARG_ARRAYTYPE_P(1);
+
+    int na, n;
+    int *da;
+
+    CHECKARRVALID(a);
+
+    na = ARRNELEMS(a);
+    da = ARRPTR(a);
+
+    for (n = 0; n < na; n++) {
+        roaring_bitmap_add(r1, da[n]);
+    } 
+
+    size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
+
+    bytea *serializedbytes = (bytea *) palloc(VARHDRSZ + expectedsize);
+    roaring_bitmap_portable_serialize(r1, VARDATA(serializedbytes));
+    roaring_bitmap_free(r1);
+
+    SET_VARSIZE(serializedbytes, VARHDRSZ + expectedsize);
+    PG_RETURN_BYTEA_P(serializedbytes);
+}
+
 //bitmap build trans
 PG_FUNCTION_INFO_V1(rb_build_trans);
 Datum rb_build_trans(PG_FUNCTION_ARGS);
@@ -484,13 +519,7 @@ rb_build_trans(PG_FUNCTION_ARGS) {
 
     int32 offsetid = PG_GETARG_INT32(1);
 
-    roaring_bitmap_add(r1, offsetid);
-
-#ifdef DEBUG
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-
-    elog(NOTICE, " *********************** rb_build_trans card1:%d ************* ", card1);
-#endif    
+    roaring_bitmap_add(r1, offsetid);    
 
     size_t expectedsize = roaring_bitmap_portable_size_in_bytes(r1);
 
@@ -516,13 +545,6 @@ rb_build_trans_pre(PG_FUNCTION_ARGS) {
 
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
-
-#ifdef DEBUG
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
-
-    elog(NOTICE, " *********************** rb_build_trans_pre card1:%d card2: %d ************* ", card1, card2);
-#endif
 
     roaring_bitmap_or_inplace(r1, r2);
     roaring_bitmap_free(r2);
@@ -647,13 +669,6 @@ rb_or_trans(PG_FUNCTION_ARGS) {
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
-#ifdef DEBUG
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
-
-    elog(NOTICE, " *********************** rb_or_trans card1:%d card2: %d ************* ", card1, card2);
-#endif
-
     roaring_bitmap_or_inplace(r1, r2);
     roaring_bitmap_free(r2);
 
@@ -682,13 +697,6 @@ rb_and_trans(PG_FUNCTION_ARGS) {
 
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
-
-#ifdef DEBUG
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
-
-    elog(NOTICE, " *********************** rb_and_trans card1:%d card2: %d ************* ", card1, card2);
-#endif
 
     roaring_bitmap_and_inplace(r1, r2);
     roaring_bitmap_free(r2);
@@ -719,13 +727,6 @@ rb_xor_trans(PG_FUNCTION_ARGS) {
     roaring_bitmap_t *r2 = roaring_bitmap_portable_deserialize(VARDATA(p2));
     if (!r2) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p2 format is error")));
 
-#ifdef DEBUG
-    int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-    int32 card2 = (int) roaring_bitmap_get_cardinality(r2);
-
-    elog(NOTICE, " *********************** rb_xor_trans card1:%d card2: %d ************* ", card1, card2);
-#endif
-
     roaring_bitmap_xor_inplace(r1, r2);
     roaring_bitmap_free(r2);
 
@@ -751,11 +752,7 @@ rb_cardinality_trans(PG_FUNCTION_ARGS) {
     if (!r1) ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("bitmap p1 format is error")));
 
     int32 card1 = (int) roaring_bitmap_get_cardinality(r1);
-    roaring_bitmap_free(r1);
-
-#ifdef DEBUG
-    elog(NOTICE, " *********************** rb_cardinality_trans card1:%d ************* ", card1);
-#endif    
+    roaring_bitmap_free(r1);   
 
     PG_RETURN_INT32(card1);
 }
