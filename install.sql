@@ -242,6 +242,7 @@ CREATE AGGREGATE rb_and_cardinality_agg(roaringbitmap)(
        FINALFUNC = rb_cardinality_trans
 );
 
+
 CREATE OR REPLACE FUNCTION rb_xor_trans(roaringbitmap, roaringbitmap)
      RETURNS roaringbitmap
       AS 'roaringbitmap.so', 'rb_xor_trans'
